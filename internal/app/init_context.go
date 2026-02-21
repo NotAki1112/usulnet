@@ -16,9 +16,11 @@ import (
 	"github.com/fr4nsys/usulnet/internal/scheduler/workers"
 	auditsvc "github.com/fr4nsys/usulnet/internal/services/audit"
 	authsvc "github.com/fr4nsys/usulnet/internal/services/auth"
+	calendarsvc "github.com/fr4nsys/usulnet/internal/services/calendar"
 	backupsvc "github.com/fr4nsys/usulnet/internal/services/backup"
 	configsvc "github.com/fr4nsys/usulnet/internal/services/config"
 	containersvc "github.com/fr4nsys/usulnet/internal/services/container"
+	dockerconfigsvc "github.com/fr4nsys/usulnet/internal/services/dockerconfig"
 	hostsvc "github.com/fr4nsys/usulnet/internal/services/host"
 	imagesvc "github.com/fr4nsys/usulnet/internal/services/image"
 	networksvc "github.com/fr4nsys/usulnet/internal/services/network"
@@ -70,6 +72,7 @@ type initContext struct {
 	configSyncService   *configsvc.SyncService
 	updateService       *updatesvc.Service
 	notificationService *notificationsvc.Service
+	dockerConfigService *dockerconfigsvc.Service
 
 	// Scheduler (populated by initScheduler)
 	scheduler     *scheduler.Scheduler
@@ -78,4 +81,5 @@ type initContext struct {
 	// API (populated by initAPI)
 	registryRepo      *postgres.RegistryRepository
 	registryBrowseSvc *registrysvc.Service
+	calendarService   *calendarsvc.Service
 }

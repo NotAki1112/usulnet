@@ -2,6 +2,7 @@ package partials
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fr4nsys/usulnet/internal/web/templates/types"
 )
@@ -82,6 +83,7 @@ templ Sidebar(active string, user *types.UserData, stats *types.StatsData, editi
 				@navItem("Backups", "fa-archive", "/backups", active == "backups", 0)
 				if !prefs.IsHidden("config") {
 					@navItem("Config", "fa-cogs", "/config", active == "config", 0)
+					@navItem("Docker Engine", "fab fa-docker", "/config/docker", active == "docker-config", 0)
 				}
 				if !prefs.IsHidden("secrets") {
 					@navItem("Secrets", "fa-lock", "/secrets", active == "secrets", 0)
@@ -291,13 +293,15 @@ templ Sidebar(active string, user *types.UserData, stats *types.StatsData, editi
 		<!-- User Section -->
 		<div class="p-4 border-t border-dark-600">
 			<div class="flex items-center gap-3">
-				<div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500/20 to-primary-600/20 flex items-center justify-center text-primary-400 font-medium text-sm">
-					{ getUserInitial(user) }
-				</div>
-				<div class="flex-1 min-w-0">
-					<p class="text-sm font-medium text-white truncate">{ getUserName(user) }</p>
-					<p class="text-xs text-gray-500 truncate">{ getUserRole(user) }</p>
-				</div>
+				<a href="/profile" class="flex items-center gap-3 flex-1 min-w-0 group" title="Profile & Preferences">
+					<div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500/20 to-primary-600/20 flex items-center justify-center text-primary-400 font-medium text-sm flex-shrink-0 group-hover:from-primary-500/30 group-hover:to-primary-600/30 transition-colors">
+						{ getUserInitial(user) }
+					</div>
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium text-white truncate group-hover:text-primary-400 transition-colors">{ getUserName(user) }</p>
+						<p class="text-xs text-gray-500 truncate">{ getUserRole(user) }</p>
+					</div>
+				</a>
 				<form method="POST" action="/logout" style="display:inline" onsubmit="this.elements.csrf_token.value = document.querySelector('meta[name=csrf-token]')?.content || ''">
 					<input type="hidden" name="csrf_token" value=""/>
 					<button type="submit" class="p-2 text-gray-400 hover:text-red-400 transition-colors" title="Logout">
@@ -386,7 +390,7 @@ templ navItem(label, icon, url string, isActive bool, badge int) {
 			templ.KV("active bg-primary-500/10 text-primary-400", isActive),
 			templ.KV("text-gray-300 hover:bg-dark-700 hover:text-primary-400", !isActive) }
 	>
-		<i class={ "fas " + icon + " w-5 text-center text-sm" }></i>
+		<i class={ iconClass(icon) + " w-5 text-center text-sm" }></i>
 		<span class="text-sm font-medium">{ label }</span>
 		if badge > 0 {
 			<span class="ml-auto text-xs bg-dark-600 text-gray-300 px-2 py-0.5 rounded-full">{ itoa(badge) }</span>
@@ -401,7 +405,7 @@ templ navItemDanger(label, icon, url string, isActive bool, badge int) {
 			templ.KV("active bg-primary-500/10 text-primary-400", isActive),
 			templ.KV("text-gray-300 hover:bg-dark-700 hover:text-primary-400", !isActive) }
 	>
-		<i class={ "fas " + icon + " w-5 text-center text-sm" }></i>
+		<i class={ iconClass(icon) + " w-5 text-center text-sm" }></i>
 		<span class="text-sm font-medium">{ label }</span>
 		if badge > 0 {
 			<span class="ml-auto text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">{ itoa(badge) }</span>
@@ -416,7 +420,7 @@ templ navItemPrimary(label, icon, url string, isActive bool, badge int) {
 			templ.KV("active bg-primary-500/10 text-primary-400", isActive),
 			templ.KV("text-gray-300 hover:bg-dark-700 hover:text-primary-400", !isActive) }
 	>
-		<i class={ "fas " + icon + " w-5 text-center text-sm" }></i>
+		<i class={ iconClass(icon) + " w-5 text-center text-sm" }></i>
 		<span class="text-sm font-medium">{ label }</span>
 		if badge > 0 {
 			<span class="ml-auto text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded-full">{ itoa(badge) }</span>
@@ -431,7 +435,7 @@ templ navItemLocked(label, icon string, requiredEdition string) {
 		class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-500/60 cursor-default"
 		title={ requiredEditionLabel(requiredEdition) + " feature" }
 	>
-		<i class={ "fas " + icon + " w-5 text-center text-sm opacity-40" }></i>
+		<i class={ iconClass(icon) + " w-5 text-center text-sm opacity-40" }></i>
 		<span class="text-sm font-medium">{ label }</span>
 		if requiredEdition == "biz" {
 			<span class="ml-auto text-[9px] font-semibold tracking-wide bg-blue-500/10 text-blue-400/60 px-1.5 py-0.5 rounded">Business</span>
@@ -506,4 +510,14 @@ func getUserRole(user *types.UserData) string {
 
 func itoa(n int) string {
 	return fmt.Sprintf("%d", n)
+}
+
+// iconClass returns the full Font Awesome class for an icon. If the icon
+// already contains a prefix (e.g. "fab fa-docker"), it is returned as-is.
+// Otherwise "fas " is prepended (e.g. "fa-cogs" → "fas fa-cogs").
+func iconClass(icon string) string {
+	if strings.HasPrefix(icon, "fab ") || strings.HasPrefix(icon, "fas ") || strings.HasPrefix(icon, "far ") {
+		return icon
+	}
+	return "fas " + icon
 }

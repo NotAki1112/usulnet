@@ -35,8 +35,10 @@ import (
 	imagesignsvc "github.com/fr4nsys/usulnet/internal/services/imagesign"
 	logaggsvc "github.com/fr4nsys/usulnet/internal/services/logagg"
 	opasvc "github.com/fr4nsys/usulnet/internal/services/opa"
+	calendarsvc "github.com/fr4nsys/usulnet/internal/services/calendar"
 	changessvc "github.com/fr4nsys/usulnet/internal/services/changes"
 	costoptsvc "github.com/fr4nsys/usulnet/internal/services/costopt"
+	dockerconfigsvc "github.com/fr4nsys/usulnet/internal/services/dockerconfig"
 	driftsvc "github.com/fr4nsys/usulnet/internal/services/drift"
 	dashboardsvc "github.com/fr4nsys/usulnet/internal/services/dashboard"
 	registrysvc "github.com/fr4nsys/usulnet/internal/services/registry"
@@ -653,6 +655,10 @@ type Handler struct {
 	driftSvc *driftsvc.Service
 	// Cost/Resource Optimization
 	costOptSvc *costoptsvc.Service
+	// Docker daemon configuration (local only)
+	dockerConfigSvc *dockerconfigsvc.Service
+	// Calendar service for events, tasks, notes, checklists
+	calendarSvc *calendarsvc.Service
 	// Phase 4: Custom dashboards
 	dashboardSvc *dashboardsvc.Service
 	// Phase 7.2: Session recording replay
@@ -741,6 +747,10 @@ type HandlerDeps struct {
 	DriftSvc *driftsvc.Service
 	// Cost/Resource Optimization
 	CostOptSvc *costoptsvc.Service
+	// Docker daemon configuration (local only)
+	DockerConfigSvc *dockerconfigsvc.Service
+	// Calendar service for events, tasks, notes, checklists
+	CalendarSvc *calendarsvc.Service
 	// Phase 4: Custom dashboards
 	DashboardSvc *dashboardsvc.Service
 	// Phase 7.2: Session recording replay
@@ -824,6 +834,8 @@ func NewTemplHandler(deps HandlerDeps) *Handler {
 		changesSvc:             deps.ChangesSvc,
 		driftSvc:               deps.DriftSvc,
 		costOptSvc:             deps.CostOptSvc,
+		dockerConfigSvc:        deps.DockerConfigSvc,
+		calendarSvc:            deps.CalendarSvc,
 		dashboardSvc:           deps.DashboardSvc,
 		recordingSvc:           deps.RecordingSvc,
 		registryBrowseSvc:      deps.RegistryBrowseSvc,
@@ -1547,7 +1559,6 @@ func (h *Handler) StackDeploy(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	ctx := r.Context()
 	name := r.FormValue("name")
 	composeFile := r.FormValue("compose")
 
@@ -1563,14 +1574,21 @@ func (h *Handler) StackDeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.services.Stacks().Deploy(ctx, name, composeFile); err != nil {
-		slog.Error("stack deploy failed", "name", name, "error", err)
-		h.setFlash(w, r, "error", "Failed to deploy stack: "+err.Error())
-		h.redirect(w, r, "/stacks/new")
-		return
+	// Non-streaming fallback: run deploy in background so it completes even
+	// if the browser navigates away or times out.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
-	h.setFlash(w, r, "success", "Stack '"+name+"' deployed successfully")
-	h.redirect(w, r, "/stacks/"+name)
+
+	go func() {
+		if err := h.services.Stacks().Deploy(bgCtx, name, composeFile); err != nil {
+			slog.Error("stack deploy failed", "name", name, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Stack '"+name+"' is being deployed. Refresh for status.")
+	h.redirect(w, r, "/stacks")
 }
 
 // stackDeploySSE runs a streaming stack deploy and writes SSE events to the client.
@@ -1592,7 +1610,15 @@ func (h *Handler) stackDeploySSE(w http.ResponseWriter, r *http.Request, name, c
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	ctx := r.Context()
+	// Use background context so the deploy continues even if the browser
+	// disconnects (tab closed, navigation, etc.). Without this, closing
+	// the browser kills docker-compose mid-deploy and leaves containers
+	// in a broken state.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
+	}
+
 	logCh := make(chan string, 64)
 
 	type doneResult struct {
@@ -1602,22 +1628,40 @@ func (h *Handler) stackDeploySSE(w http.ResponseWriter, r *http.Request, name, c
 	doneCh := make(chan doneResult, 1)
 
 	go func() {
-		sn, err := h.services.Stacks().DeployStream(ctx, name, composeFile, logCh)
+		sn, err := h.services.Stacks().DeployStream(bgCtx, name, composeFile, logCh)
 		doneCh <- doneResult{stackName: sn, err: err}
 	}()
 
-	writeSSE := func(event, data string) {
-		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+	writeSSE := func(event, data string) bool {
+		_, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+		if err != nil {
+			return false // client disconnected
+		}
 		flusher.Flush()
+		return true
 	}
 
+	// Stream logs to client. If the client disconnects, drain the channel
+	// silently so the deploy goroutine can finish without blocking.
+	clientConnected := true
 	for line := range logCh {
-		// Escape newlines inside the data field so SSE framing stays intact.
-		escaped := strings.ReplaceAll(line, "\n", " ")
-		writeSSE("log", escaped)
+		if clientConnected {
+			escaped := strings.ReplaceAll(line, "\n", " ")
+			if !writeSSE("log", escaped) {
+				clientConnected = false
+			}
+		}
 	}
 
 	res := <-doneCh
+	if !clientConnected {
+		if res.err != nil {
+			slog.Error("stack deploy failed (client disconnected)", "name", name, "error", res.err)
+		} else {
+			slog.Info("stack deploy completed (client had disconnected)", "name", name)
+		}
+		return
+	}
 	if res.err != nil {
 		msg, _ := json.Marshal(res.err.Error())
 		writeSSE("done", fmt.Sprintf(`{"ok":false,"error":%s}`, msg))
@@ -1679,25 +1723,38 @@ func (h *Handler) StackRemove(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) SecurityScan(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	if err := h.services.Security().ScanAll(ctx); err != nil {
-		h.setFlash(w, r, "error", "Security scan failed: "+err.Error())
-		h.redirect(w, r, "/security")
-		return
+	// Run in background so the scan completes even if the browser navigates away.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
-	h.setFlash(w, r, "success", "Security scan completed")
+
+	go func() {
+		if err := h.services.Security().ScanAll(bgCtx); err != nil {
+			slog.Error("security scan failed", "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Security scan started. Results will appear shortly.")
 	h.redirect(w, r, "/security")
 }
 
 func (h *Handler) SecurityScanContainer(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := getIDParam(r)
-	if _, err := h.services.Security().Scan(ctx, id); err != nil {
-		h.setFlash(w, r, "error", "Container scan failed: "+err.Error())
-		h.redirect(w, r, "/security")
-		return
+
+	// Run in background so the scan completes even if the browser navigates away.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
-	h.setFlash(w, r, "success", "Container scan completed")
+
+	go func() {
+		if _, err := h.services.Security().Scan(bgCtx, id); err != nil {
+			slog.Error("container security scan failed", "container", id, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Container scan started. Results will appear shortly.")
 	h.redirect(w, r, "/security")
 }
 
@@ -1743,8 +1800,6 @@ func (h *Handler) UpdateChangelog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	htmxRedirectUpdates := func() {
 		if r.Header.Get("HX-Request") == "true" {
 			w.Header().Set("HX-Redirect", "/updates")
@@ -1766,7 +1821,7 @@ func (h *Handler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 
 	if len(containerIDs) == 0 {
 		// If no specific containers selected, get all available updates
-		updates, err := updatesSvc.ListAvailable(ctx)
+		updates, err := updatesSvc.ListAvailable(r.Context())
 		if err != nil {
 			slog.Error("Failed to list available updates", "error", err)
 			h.setFlash(w, r, "error", "Failed to fetch available updates")
@@ -1784,21 +1839,27 @@ func (h *Handler) UpdateBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var succeeded, failed int
-	for _, cid := range containerIDs {
-		if err := updatesSvc.Apply(ctx, cid, true, ""); err != nil {
-			slog.Error("Failed to apply update", "container", cid, "error", err)
-			failed++
-		} else {
-			succeeded++
-		}
+	// Run updates in background so they complete even if browser closes.
+	// Container updates can take several minutes for pulling + recreating.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
-	if failed > 0 {
-		h.setFlash(w, r, "warning", fmt.Sprintf("Updated %d containers, %d failed", succeeded, failed))
-	} else {
-		h.setFlash(w, r, "success", fmt.Sprintf("Successfully updated %d containers", succeeded))
-	}
+	go func() {
+		var succeeded, failed int
+		for _, cid := range containerIDs {
+			if err := updatesSvc.Apply(bgCtx, cid, true, ""); err != nil {
+				slog.Error("Failed to apply update", "container", cid, "error", err)
+				failed++
+			} else {
+				succeeded++
+			}
+		}
+		slog.Info("Batch update completed", "succeeded", succeeded, "failed", failed)
+	}()
+
+	h.setFlash(w, r, "success", fmt.Sprintf("Updating %d containers in the background. Refresh for progress.", len(containerIDs)))
 	htmxRedirectUpdates()
 }
 

@@ -10,6 +10,7 @@ package swarm
 import (
 	"context"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/google/uuid"
@@ -321,6 +322,84 @@ func (s *Service) ListTasks(ctx context.Context, hostID uuid.UUID, serviceID str
 	}
 
 	return tasks, nil
+}
+
+// ============================================================================
+// Node Management
+// ============================================================================
+
+// UpdateNode updates a node's role (promote/demote) or availability (active/drain/pause).
+func (s *Service) UpdateNode(ctx context.Context, hostID uuid.UUID, nodeID, role, availability string) error {
+	client, err := s.getClient(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("update node %s: get client for host %s: %w", nodeID, hostID, err)
+	}
+
+	if err := client.SwarmNodeUpdate(ctx, nodeID, role, availability); err != nil {
+		return fmt.Errorf("update node: %w", err)
+	}
+
+	s.logger.Info("Swarm node updated", "node_id", nodeID, "role", role, "availability", availability)
+	return nil
+}
+
+// JoinSwarm joins this host to an existing Swarm cluster.
+func (s *Service) JoinSwarm(ctx context.Context, hostID uuid.UUID, input *models.SwarmJoinInput) error {
+	client, err := s.getClient(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("join swarm: get client for host %s: %w", hostID, err)
+	}
+
+	if err := client.SwarmJoin(ctx, input.RemoteAddr, input.JoinToken, input.ListenAddr); err != nil {
+		return fmt.Errorf("join swarm: %w", err)
+	}
+
+	s.logger.Info("Host joined Swarm", "host_id", hostID, "remote_addr", input.RemoteAddr)
+	return nil
+}
+
+// ============================================================================
+// Service Update & Rollback
+// ============================================================================
+
+// UpdateService updates an existing Swarm service (image, env, replicas, ports, etc.).
+func (s *Service) UpdateService(ctx context.Context, hostID uuid.UUID, serviceID string, opts docker.SwarmServiceUpdateOptions) error {
+	client, err := s.getClient(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("update service %s: get client for host %s: %w", serviceID, hostID, err)
+	}
+
+	if err := client.SwarmServiceUpdate(ctx, serviceID, opts); err != nil {
+		return fmt.Errorf("update service: %w", err)
+	}
+
+	s.logger.Info("Swarm service updated", "service_id", serviceID)
+	return nil
+}
+
+// RollbackService rolls a service back to its previous spec.
+func (s *Service) RollbackService(ctx context.Context, hostID uuid.UUID, serviceID string) error {
+	client, err := s.getClient(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("rollback service %s: get client for host %s: %w", serviceID, hostID, err)
+	}
+
+	if err := client.SwarmServiceRollback(ctx, serviceID); err != nil {
+		return fmt.Errorf("rollback service: %w", err)
+	}
+
+	s.logger.Info("Swarm service rolled back", "service_id", serviceID)
+	return nil
+}
+
+// ServiceLogs returns the logs of a Swarm service.
+func (s *Service) ServiceLogs(ctx context.Context, hostID uuid.UUID, serviceID string, tail string, follow bool) (io.ReadCloser, error) {
+	client, err := s.getClient(ctx, hostID)
+	if err != nil {
+		return nil, fmt.Errorf("service logs %s: get client for host %s: %w", serviceID, hostID, err)
+	}
+
+	return client.SwarmServiceLogs(ctx, serviceID, tail, follow)
 }
 
 // ============================================================================

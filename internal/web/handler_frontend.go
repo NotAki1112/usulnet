@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -528,10 +529,16 @@ func (h *Handler) DashboardTempl(w http.ResponseWriter, r *http.Request) {
 	pageData := h.preparePageData(r, "Dashboard", "dashboard")
 
 	// Get containers
-	containersList, _, _ := h.services.Containers().List(ctx, nil)
+	containersList, _, err := h.services.Containers().List(ctx, nil)
+	if err != nil {
+		slog.Error("dashboard: failed to load containers", "error", err)
+	}
 
 	// Get events
-	eventsList, _ := h.services.Events().List(ctx, 10)
+	eventsList, err := h.services.Events().List(ctx, 10)
+	if err != nil {
+		slog.Error("dashboard: failed to load events", "error", err)
+	}
 
 	// Get system info from Docker host
 	var sysInfo *SystemInfoView
@@ -898,7 +905,7 @@ func (h *Handler) ContainerSettingsUpdate(w http.ResponseWriter, r *http.Request
 	dockerClient, err := h.services.Containers().GetDockerClient(ctx)
 	if err != nil {
 		h.setFlash(w, r, "error", "Docker client unavailable: "+err.Error())
-		http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusFound)
+		http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusSeeOther)
 		return
 	}
 
@@ -969,7 +976,7 @@ func (h *Handler) ContainerSettingsUpdate(w http.ResponseWriter, r *http.Request
 	if wasRunning {
 		if err := dockerClient.ContainerStop(ctx, id, nil); err != nil {
 			h.setFlash(w, r, "error", "Failed to stop container: "+err.Error())
-			http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusFound)
+			http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusSeeOther)
 			return
 		}
 	}
@@ -977,7 +984,7 @@ func (h *Handler) ContainerSettingsUpdate(w http.ResponseWriter, r *http.Request
 	// Remove the old container
 	if err := dockerClient.ContainerRemove(ctx, id, true, false); err != nil {
 		h.setFlash(w, r, "error", "Failed to remove old container: "+err.Error())
-		http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusFound)
+		http.Redirect(w, r, "/containers/"+id+"/settings", http.StatusSeeOther)
 		return
 	}
 
@@ -1019,7 +1026,7 @@ func (h *Handler) ContainerSettingsUpdate(w http.ResponseWriter, r *http.Request
 	newID, err := dockerClient.ContainerCreate(ctx, createOpts)
 	if err != nil {
 		h.setFlash(w, r, "error", "Failed to create container: "+err.Error())
-		http.Redirect(w, r, "/containers", http.StatusFound)
+		http.Redirect(w, r, "/containers", http.StatusSeeOther)
 		return
 	}
 
@@ -1027,13 +1034,13 @@ func (h *Handler) ContainerSettingsUpdate(w http.ResponseWriter, r *http.Request
 	if wasRunning {
 		if err := dockerClient.ContainerStart(ctx, newID); err != nil {
 			h.setFlash(w, r, "warning", "Container created but failed to start: "+err.Error())
-			http.Redirect(w, r, "/containers/"+newID, http.StatusFound)
+			http.Redirect(w, r, "/containers/"+newID, http.StatusSeeOther)
 			return
 		}
 	}
 
 	h.setFlash(w, r, "success", "Container settings updated successfully")
-	http.Redirect(w, r, "/containers/"+newID, http.StatusFound)
+	http.Redirect(w, r, "/containers/"+newID, http.StatusSeeOther)
 }
 
 // ContainerSettingsSummary returns an HTMX fragment with read-only container config summary.
@@ -1043,8 +1050,9 @@ func (h *Handler) ContainerSettingsSummary(w http.ResponseWriter, r *http.Reques
 
 	container, err := h.services.Containers().Get(ctx, id)
 	if err != nil {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<div class="p-4 text-gray-500 text-sm">Container not found or not running</div>`))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`<div class="p-4 text-red-400 text-sm"><i class="fas fa-exclamation-triangle mr-1"></i>Container not found or not running</div>`))
 		return
 	}
 
@@ -1212,16 +1220,16 @@ func (h *Handler) ContainersPartialTempl(w http.ResponseWriter, r *http.Request)
 			stateClass = "bg-yellow-500"
 		}
 
-		html := `<div class="flex items-center gap-4 p-4 hover:bg-dark-700/50 transition-colors">
+		snippet := `<div class="flex items-center gap-4 p-4 hover:bg-dark-700/50 transition-colors">
 			<div class="w-2.5 h-2.5 rounded-full flex-shrink-0 ` + stateClass + `"></div>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2">
-					<a href="/containers/` + c.ID + `" class="font-medium text-white hover:text-primary-400 truncate">` + c.Name + `</a>
+					<a href="/containers/` + html.EscapeString(c.ID) + `" class="font-medium text-white hover:text-primary-400 truncate">` + html.EscapeString(c.Name) + `</a>
 				</div>
-				<p class="text-sm text-gray-500 truncate">` + c.Image + `</p>
+				<p class="text-sm text-gray-500 truncate">` + html.EscapeString(c.Image) + `</p>
 			</div>
 		</div>`
-		w.Write([]byte(html))
+		w.Write([]byte(snippet))
 	}
 }
 
@@ -1314,21 +1322,21 @@ func (h *Handler) EventsPartialTempl(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Use the pre-built Message for audit events, or compose for Docker events
-		displayMsg := e.Message
+		displayMsg := html.EscapeString(e.Message)
 		if e.Type != "audit" {
-			displayMsg = "<span class=\"font-medium\">" + e.Action + "</span> <span class=\"text-gray-400\">" + e.ActorName + "</span>"
+			displayMsg = "<span class=\"font-medium\">" + html.EscapeString(e.Action) + "</span> <span class=\"text-gray-400\">" + html.EscapeString(e.ActorName) + "</span>"
 		}
 
-		html := `<div class="flex items-start gap-3 p-3 hover:bg-dark-700/50 transition-colors">
+		snippet := `<div class="flex items-start gap-3 p-3 hover:bg-dark-700/50 transition-colors">
 			<div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ` + colorClass + `">
 				<i class="fas ` + iconClass + ` text-xs"></i>
 			</div>
 			<div class="flex-1 min-w-0">
 				<p class="text-sm text-white">` + displayMsg + `</p>
-				<p class="text-xs text-gray-500">` + e.TimeHuman + `</p>
+				<p class="text-xs text-gray-500">` + html.EscapeString(e.TimeHuman) + `</p>
 			</div>
 		</div>`
-		w.Write([]byte(html))
+		w.Write([]byte(snippet))
 	}
 }
 
@@ -1347,7 +1355,15 @@ func (h *Handler) NotificationsPartialTempl(w http.ResponseWriter, r *http.Reque
 	}
 
 	events, _, err := alertSvc.ListEvents(ctx, models.AlertEventListOptions{Limit: 5})
-	if err != nil || len(events) == 0 {
+	if err != nil {
+		slog.Error("failed to load notifications", "error", err)
+		w.Write([]byte(`<div class="p-4 text-center text-gray-500">
+			<i class="fas fa-triangle-exclamation text-2xl mb-2 opacity-50"></i>
+			<p class="text-sm">Failed to load notifications</p>
+		</div>`))
+		return
+	}
+	if len(events) == 0 {
 		w.Write([]byte(`<div class="p-4 text-center text-gray-500">
 			<i class="fas fa-bell-slash text-2xl mb-2 opacity-50"></i>
 			<p class="text-sm">No new notifications</p>
@@ -1374,7 +1390,7 @@ func (h *Handler) NotificationsPartialTempl(w http.ResponseWriter, r *http.Reque
 					<p class="text-xs text-gray-500">%s</p>
 				</div>
 			</a>`,
-			readClass, icon, event.Message, event.FiredAt.Format("15:04"),
+			readClass, icon, html.EscapeString(event.Message), event.FiredAt.Format("15:04"),
 		))
 	}
 	b.WriteString(`</div>`)
@@ -1394,19 +1410,25 @@ func (h *Handler) SearchPartialTempl(w http.ResponseWriter, r *http.Request) {
 
 	// Search containers
 	filters := map[string]string{"search": query}
-	containersList, _, _ := h.services.Containers().List(ctx, filters)
+	containersList, _, err := h.services.Containers().List(ctx, filters)
+	if err != nil {
+		slog.Error("search containers failed", "error", err, "query", query)
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
+	safeQuery := html.EscapeString(query)
+
 	if len(containersList) == 0 {
-		html := `<div class="absolute top-full left-0 right-0 mt-2 bg-dark-800 rounded-lg border border-dark-600 shadow-xl p-4 text-center text-gray-500 text-sm">
-			No results found for "` + query + `"
+		snippet := `<div class="absolute top-full left-0 right-0 mt-2 bg-dark-800 rounded-lg border border-dark-600 shadow-xl p-4 text-center text-gray-500 text-sm">
+			No results found for "` + safeQuery + `"
 		</div>`
-		w.Write([]byte(html))
+		w.Write([]byte(snippet))
 		return
 	}
 
-	html := `<div class="absolute top-full left-0 right-0 mt-2 bg-dark-800 rounded-lg border border-dark-600 shadow-xl overflow-hidden max-h-80 overflow-y-auto">`
+	var b strings.Builder
+	b.WriteString(`<div class="absolute top-full left-0 right-0 mt-2 bg-dark-800 rounded-lg border border-dark-600 shadow-xl overflow-hidden max-h-80 overflow-y-auto">`)
 
 	// Limit to 5 results
 	limit := 5
@@ -1421,23 +1443,23 @@ func (h *Handler) SearchPartialTempl(w http.ResponseWriter, r *http.Request) {
 			stateColor = "text-green-400"
 		}
 
-		html += `<a href="/containers/` + c.ID + `" class="flex items-center gap-3 p-3 hover:bg-dark-700 transition-colors">
+		b.WriteString(`<a href="/containers/` + html.EscapeString(c.ID) + `" class="flex items-center gap-3 p-3 hover:bg-dark-700 transition-colors">
 			<i class="fas fa-cube ` + stateColor + `"></i>
 			<div class="flex-1 min-w-0">
-				<p class="text-sm text-white truncate">` + c.Name + `</p>
-				<p class="text-xs text-gray-500 truncate">` + c.Image + `</p>
+				<p class="text-sm text-white truncate">` + html.EscapeString(c.Name) + `</p>
+				<p class="text-xs text-gray-500 truncate">` + html.EscapeString(c.Image) + `</p>
 			</div>
-		</a>`
+		</a>`)
 	}
 
 	if len(containersList) > 5 {
-		html += `<a href="/containers?search=` + query + `" class="block p-3 text-center text-sm text-primary-400 hover:bg-dark-700 border-t border-dark-600">
+		b.WriteString(`<a href="/containers?search=` + url.QueryEscape(query) + `" class="block p-3 text-center text-sm text-primary-400 hover:bg-dark-700 border-t border-dark-600">
 			View all ` + strconv.Itoa(len(containersList)) + ` results
-		</a>`
+		</a>`)
 	}
 
-	html += `</div>`
-	w.Write([]byte(html))
+	b.WriteString(`</div>`)
+	w.Write([]byte(b.String()))
 }
 
 // ============================================================================
@@ -1920,8 +1942,15 @@ func (h *Handler) UpdatesTempl(w http.ResponseWriter, r *http.Request) {
 	var available []UpdateView
 	var history []UpdateHistoryView
 	if updatesSvc != nil {
-		available, _ = updatesSvc.ListAvailable(ctx)
-		history, _ = updatesSvc.GetHistory(ctx)
+		var err error
+		available, err = updatesSvc.ListAvailable(ctx)
+		if err != nil {
+			slog.Error("updates: failed to list available updates", "error", err)
+		}
+		history, err = updatesSvc.GetHistory(ctx)
+		if err != nil {
+			slog.Error("updates: failed to get update history", "error", err)
+		}
 	}
 
 	// Get containers for manual update dropdown and policy creation
@@ -1999,7 +2028,6 @@ func (h *Handler) UpdatesCheckTempl(w http.ResponseWriter, r *http.Request) {
 
 // UpdateApplyTempl applies an update to a specific container.
 func (h *Handler) UpdateApplyTempl(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	updatesSvc := h.services.Updates()
@@ -2011,13 +2039,20 @@ func (h *Handler) UpdateApplyTempl(w http.ResponseWriter, r *http.Request) {
 
 	backup := r.FormValue("backup") != "false"
 	targetVersion := strings.TrimSpace(r.FormValue("target_version"))
-	if err := updatesSvc.Apply(ctx, id, backup, targetVersion); err != nil {
-		h.logger.Error("failed to apply update", "container", id, "error", err)
-		h.setFlash(w, r, "error", "Update failed: "+err.Error())
-	} else {
-		h.setFlash(w, r, "success", "Update started successfully")
+
+	// Run update in background — updates can take minutes (pull + recreate + health check).
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
+	go func() {
+		if err := updatesSvc.Apply(bgCtx, id, backup, targetVersion); err != nil {
+			h.logger.Error("failed to apply update", "container", id, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Update started. Refresh for progress.")
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/updates")
 		w.WriteHeader(http.StatusOK)
@@ -2028,8 +2063,6 @@ func (h *Handler) UpdateApplyTempl(w http.ResponseWriter, r *http.Request) {
 
 // UpdateManual handles manual update of a container to a specific version.
 func (h *Handler) UpdateManual(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	containerID := r.FormValue("container_id")
 	targetVersion := strings.TrimSpace(r.FormValue("target_version"))
 	backup := r.FormValue("backup") == "true"
@@ -2047,19 +2080,24 @@ func (h *Handler) UpdateManual(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := updatesSvc.Apply(ctx, containerID, backup, targetVersion); err != nil {
-		h.logger.Error("failed to apply manual update", "container", containerID, "version", targetVersion, "error", err)
-		h.setFlash(w, r, "error", "Update failed: "+err.Error())
-	} else {
-		h.setFlash(w, r, "success", "Manual update to "+targetVersion+" started successfully")
+	// Run update in background — updates can take minutes.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
+	go func() {
+		if err := updatesSvc.Apply(bgCtx, containerID, backup, targetVersion); err != nil {
+			h.logger.Error("failed to apply manual update", "container", containerID, "version", targetVersion, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Manual update to "+targetVersion+" started. Refresh for progress.")
 	http.Redirect(w, r, "/updates", http.StatusSeeOther)
 }
 
 // UpdateRollbackTempl rolls back a previous update.
 func (h *Handler) UpdateRollbackTempl(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
 	updatesSvc := h.services.Updates()
@@ -2069,13 +2107,19 @@ func (h *Handler) UpdateRollbackTempl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := updatesSvc.Rollback(ctx, id); err != nil {
-		h.logger.Error("update rollback failed", "container", id, "error", err)
-		h.setFlash(w, r, "error", "Rollback failed: "+err.Error())
-	} else {
-		h.setFlash(w, r, "success", "Rollback completed successfully")
+	// Run rollback in background — involves stopping, renaming, and starting containers.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
+	go func() {
+		if err := updatesSvc.Rollback(bgCtx, id); err != nil {
+			h.logger.Error("update rollback failed", "container", id, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Rollback started. Refresh for progress.")
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/updates")
 		w.WriteHeader(http.StatusOK)

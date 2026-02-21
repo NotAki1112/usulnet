@@ -381,6 +381,20 @@ templ Calendar(data CalendarData) {
 					taskFilter: 'all',
 					colorMap: { blue: '#3b82f6', green: '#22c55e', red: '#ef4444', yellow: '#eab308', purple: '#a855f7', primary: '#ff6b35' },
 
+					// CSRF token from meta tag (set by base layout)
+					get csrfToken() {
+						return document.querySelector('meta[name="csrf-token"]')?.content || '';
+					},
+
+					// Headers for state-changing requests (POST/PUT/PATCH/DELETE)
+					get jsonHeaders() {
+						return { 'Content-Type': 'application/json', 'X-CSRF-Token': this.csrfToken };
+					},
+
+					get csrfHeaders() {
+						return { 'X-CSRF-Token': this.csrfToken };
+					},
+
 					async init() {
 						await Promise.all([
 							this.loadEvents(),
@@ -390,11 +404,11 @@ templ Calendar(data CalendarData) {
 						]);
 					},
 
-					// ── API helpers ──
+					// ── Data loading ──
 
 					async loadEvents() {
 						try {
-							const resp = await fetch(`/api/v1/calendar/events?year=${this.currentDate.getFullYear()}&month=${this.currentDate.getMonth() + 1}`);
+							const resp = await fetch(`/calendar/events?year=${this.currentDate.getFullYear()}&month=${this.currentDate.getMonth() + 1}`);
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							const json = await resp.json();
 							this.events = json.data || [];
@@ -405,7 +419,7 @@ templ Calendar(data CalendarData) {
 
 					async loadTasks() {
 						try {
-							const resp = await fetch('/api/v1/calendar/tasks');
+							const resp = await fetch('/calendar/tasks');
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							const json = await resp.json();
 							this.tasks = json.data || [];
@@ -416,7 +430,7 @@ templ Calendar(data CalendarData) {
 
 					async loadNotes() {
 						try {
-							const resp = await fetch('/api/v1/calendar/notes');
+							const resp = await fetch('/calendar/notes');
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							const json = await resp.json();
 							this.notes = json.data || [];
@@ -427,7 +441,7 @@ templ Calendar(data CalendarData) {
 
 					async loadChecklists() {
 						try {
-							const resp = await fetch('/api/v1/calendar/checklists');
+							const resp = await fetch('/calendar/checklists');
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							const json = await resp.json();
 							this.checklists = json.data || [];
@@ -534,16 +548,16 @@ templ Calendar(data CalendarData) {
 						};
 						try {
 							if (this.editingEvent) {
-								const resp = await fetch('/api/v1/calendar/events/' + this.editingEvent.id, {
+								const resp = await fetch('/calendar/events/' + this.editingEvent.id, {
 									method: 'PUT',
-									headers: { 'Content-Type': 'application/json' },
+									headers: this.jsonHeaders,
 									body: JSON.stringify(payload)
 								});
 								if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							} else {
-								const resp = await fetch('/api/v1/calendar/events', {
+								const resp = await fetch('/calendar/events', {
 									method: 'POST',
-									headers: { 'Content-Type': 'application/json' },
+									headers: this.jsonHeaders,
 									body: JSON.stringify(payload)
 								});
 								if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -551,17 +565,19 @@ templ Calendar(data CalendarData) {
 							await this.loadEvents();
 						} catch (e) {
 							console.error('Failed to save event:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to save event', 'error');
 						}
 						this.showEventModal = false;
 						this.editingEvent = null;
 					},
 					async deleteEvent(id) {
 						try {
-							const resp = await fetch('/api/v1/calendar/events/' + id, { method: 'DELETE' });
+							const resp = await fetch('/calendar/events/' + id, { method: 'DELETE', headers: this.csrfHeaders });
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadEvents();
 						} catch (e) {
 							console.error('Failed to delete event:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to delete event', 'error');
 						}
 					},
 
@@ -580,15 +596,16 @@ templ Calendar(data CalendarData) {
 							due_date: this.taskForm.dueDate || null
 						};
 						try {
-							const resp = await fetch('/api/v1/calendar/tasks', {
+							const resp = await fetch('/calendar/tasks', {
 								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
+								headers: this.jsonHeaders,
 								body: JSON.stringify(payload)
 							});
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadTasks();
 						} catch (e) {
 							console.error('Failed to save task:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to save task', 'error');
 						}
 						this.showTaskModal = false;
 					},
@@ -600,9 +617,9 @@ templ Calendar(data CalendarData) {
 							due_date: null
 						};
 						try {
-							const resp = await fetch('/api/v1/calendar/tasks', {
+							const resp = await fetch('/calendar/tasks', {
 								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
+								headers: this.jsonHeaders,
 								body: JSON.stringify(payload)
 							});
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -610,24 +627,27 @@ templ Calendar(data CalendarData) {
 							await this.loadTasks();
 						} catch (e) {
 							console.error('Failed to add task:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to add task', 'error');
 						}
 					},
 					async toggleTask(task) {
 						try {
-							const resp = await fetch('/api/v1/calendar/tasks/' + task.id + '/toggle', { method: 'PATCH' });
+							const resp = await fetch('/calendar/tasks/' + task.id + '/toggle', { method: 'PATCH', headers: this.csrfHeaders });
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadTasks();
 						} catch (e) {
 							console.error('Failed to toggle task:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to toggle task', 'error');
 						}
 					},
 					async deleteTask(id) {
 						try {
-							const resp = await fetch('/api/v1/calendar/tasks/' + id, { method: 'DELETE' });
+							const resp = await fetch('/calendar/tasks/' + id, { method: 'DELETE', headers: this.csrfHeaders });
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadTasks();
 						} catch (e) {
 							console.error('Failed to delete task:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to delete task', 'error');
 						}
 					},
 
@@ -651,16 +671,16 @@ templ Calendar(data CalendarData) {
 						};
 						try {
 							if (this.editingNote) {
-								const resp = await fetch('/api/v1/calendar/notes/' + this.editingNote.id, {
+								const resp = await fetch('/calendar/notes/' + this.editingNote.id, {
 									method: 'PUT',
-									headers: { 'Content-Type': 'application/json' },
+									headers: this.jsonHeaders,
 									body: JSON.stringify(payload)
 								});
 								if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							} else {
-								const resp = await fetch('/api/v1/calendar/notes', {
+								const resp = await fetch('/calendar/notes', {
 									method: 'POST',
-									headers: { 'Content-Type': 'application/json' },
+									headers: this.jsonHeaders,
 									body: JSON.stringify(payload)
 								});
 								if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -668,17 +688,19 @@ templ Calendar(data CalendarData) {
 							await this.loadNotes();
 						} catch (e) {
 							console.error('Failed to save note:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to save note', 'error');
 						}
 						this.showNoteModal = false;
 						this.editingNote = null;
 					},
 					async deleteNote(id) {
 						try {
-							const resp = await fetch('/api/v1/calendar/notes/' + id, { method: 'DELETE' });
+							const resp = await fetch('/calendar/notes/' + id, { method: 'DELETE', headers: this.csrfHeaders });
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadNotes();
 						} catch (e) {
 							console.error('Failed to delete note:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to delete note', 'error');
 						}
 					},
 
@@ -691,15 +713,16 @@ templ Calendar(data CalendarData) {
 							items: [{ text: '', done: false }]
 						};
 						try {
-							const resp = await fetch('/api/v1/calendar/checklists', {
+							const resp = await fetch('/calendar/checklists', {
 								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
+								headers: this.jsonHeaders,
 								body: JSON.stringify(payload)
 							});
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadChecklists();
 						} catch (e) {
 							console.error('Failed to add checklist:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to add checklist', 'error');
 						}
 					},
 					async updateChecklist(cl) {
@@ -708,9 +731,9 @@ templ Calendar(data CalendarData) {
 							items: cl.items
 						};
 						try {
-							const resp = await fetch('/api/v1/calendar/checklists/' + cl.id, {
+							const resp = await fetch('/calendar/checklists/' + cl.id, {
 								method: 'PUT',
-								headers: { 'Content-Type': 'application/json' },
+								headers: this.jsonHeaders,
 								body: JSON.stringify(payload)
 							});
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -720,11 +743,12 @@ templ Calendar(data CalendarData) {
 					},
 					async deleteChecklist(id) {
 						try {
-							const resp = await fetch('/api/v1/calendar/checklists/' + id, { method: 'DELETE' });
+							const resp = await fetch('/calendar/checklists/' + id, { method: 'DELETE', headers: this.csrfHeaders });
 							if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 							await this.loadChecklists();
 						} catch (e) {
 							console.error('Failed to delete checklist:', e);
+							if (window.usulnet) window.usulnet.toast('Failed to delete checklist', 'error');
 						}
 					},
 					checklistProgress(cl) {

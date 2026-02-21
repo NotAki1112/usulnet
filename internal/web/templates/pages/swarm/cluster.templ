@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"fmt"
+	"github.com/fr4nsys/usulnet/internal/web/templates/components"
 	"github.com/fr4nsys/usulnet/internal/web/templates/layouts"
 )
 
@@ -55,15 +56,18 @@ templ Cluster(data ClusterData) {
 					</h1>
 					<p class="text-gray-400 mt-1">Docker Swarm high availability management</p>
 				</div>
-				if !data.Active {
-					<button
-						hx-post="/swarm/init"
-						hx-confirm="Initialize Docker Swarm on this node? This will make it the cluster manager."
-						class="btn btn-primary"
-					>
-						<i class="fas fa-play mr-2"></i>Initialize Swarm
-					</button>
-				}
+				<div class="flex items-center gap-2">
+					@components.RefreshButton()
+					if !data.Active {
+						<button
+							hx-post="/swarm/init"
+							hx-confirm="Initialize Docker Swarm on this node? This will make it the cluster manager."
+							class="btn btn-primary"
+						>
+							<i class="fas fa-play mr-2"></i>Initialize Swarm
+						</button>
+					}
+				</div>
 			</div>
 
 			<div id="swarm-content">
@@ -78,23 +82,61 @@ templ Cluster(data ClusterData) {
 }
 
 templ clusterInactive() {
-	<div class="card p-8 text-center">
-		<div class="text-gray-400 mb-4">
-			<i class="fas fa-network-wired text-6xl opacity-30"></i>
+	<div class="space-y-6">
+		<div class="card p-8 text-center">
+			<div class="text-gray-400 mb-4">
+				<i class="fas fa-network-wired text-6xl opacity-30"></i>
+			</div>
+			<h2 class="text-xl font-semibold text-white mb-2">Swarm Not Initialized</h2>
+			<p class="text-gray-400 mb-6 max-w-lg mx-auto">
+				Docker Swarm allows you to create a cluster of Docker nodes for high availability.
+				Initialize Swarm to start managing replicated services across multiple hosts.
+			</p>
+			<div class="card bg-dark-700 p-4 max-w-md mx-auto text-left">
+				<h3 class="text-sm font-semibold text-gray-300 mb-2">What happens when you initialize:</h3>
+				<ul class="text-sm text-gray-400 space-y-1">
+					<li><i class="fas fa-check text-green-400 mr-2"></i>This node becomes the Swarm manager</li>
+					<li><i class="fas fa-check text-green-400 mr-2"></i>Join tokens are generated for workers</li>
+					<li><i class="fas fa-check text-green-400 mr-2"></i>You can then add agent nodes as workers</li>
+					<li><i class="fas fa-check text-green-400 mr-2"></i>Enable HA for any container with replicas</li>
+				</ul>
+			</div>
 		</div>
-		<h2 class="text-xl font-semibold text-white mb-2">Swarm Not Initialized</h2>
-		<p class="text-gray-400 mb-6 max-w-lg mx-auto">
-			Docker Swarm allows you to create a cluster of Docker nodes for high availability.
-			Initialize Swarm to start managing replicated services across multiple hosts.
-		</p>
-		<div class="card bg-dark-700 p-4 max-w-md mx-auto text-left">
-			<h3 class="text-sm font-semibold text-gray-300 mb-2">What happens when you initialize:</h3>
-			<ul class="text-sm text-gray-400 space-y-1">
-				<li><i class="fas fa-check text-green-400 mr-2"></i>This node becomes the Swarm manager</li>
-				<li><i class="fas fa-check text-green-400 mr-2"></i>Join tokens are generated for workers</li>
-				<li><i class="fas fa-check text-green-400 mr-2"></i>You can then add agent nodes as workers</li>
-				<li><i class="fas fa-check text-green-400 mr-2"></i>Enable HA for any container with replicas</li>
-			</ul>
+
+		<!-- Join Existing Cluster -->
+		<div class="card p-6" x-data="{ show: false }">
+			<div class="flex items-center justify-between cursor-pointer" @click="show = !show">
+				<h3 class="text-sm font-semibold text-gray-300">
+					<i class="fas fa-sign-in-alt mr-2 text-blue-400"></i>Join an Existing Cluster
+				</h3>
+				<i class="fas fa-chevron-down text-gray-500 transition-transform" :class="show && 'rotate-180'"></i>
+			</div>
+			<div x-show="show" x-cloak class="mt-4">
+				<p class="text-sm text-gray-400 mb-4">
+					If a Swarm cluster already exists, you can join this node as a worker or manager
+					using the join token from the cluster manager.
+				</p>
+				<form method="POST" action="/swarm/join" class="space-y-3">
+					<div>
+						<label class="label text-xs">Manager Address (e.g. 192.168.1.10:2377)</label>
+						<input type="text" name="remote_addr" required placeholder="192.168.1.10:2377"
+							class="input w-full" />
+					</div>
+					<div>
+						<label class="label text-xs">Join Token</label>
+						<input type="text" name="join_token" required placeholder="SWMTKN-..."
+							class="input w-full font-mono text-xs" />
+					</div>
+					<div>
+						<label class="label text-xs">Listen Address (optional, default 0.0.0.0:2377)</label>
+						<input type="text" name="listen_addr" placeholder="0.0.0.0:2377"
+							class="input w-full" />
+					</div>
+					<button type="submit" class="btn btn-primary">
+						<i class="fas fa-sign-in-alt mr-2"></i>Join Cluster
+					</button>
+				</form>
+			</div>
 		</div>
 	</div>
 }
@@ -212,15 +254,60 @@ templ clusterActive(data ClusterData) {
 									{ fmt.Sprint(node.NCPU) } CPU, { fmt.Sprint(node.MemoryMB) } MB
 								</td>
 								<td class="p-3">
-									if !node.IsLeader {
-										<button
-											hx-delete={ fmt.Sprintf("/swarm/nodes/%s", node.ID) }
-											hx-confirm={ fmt.Sprintf("Remove node '%s' from Swarm cluster?", node.Hostname) }
-											class="btn btn-sm btn-ghost text-red-400 hover:text-red-300"
-										>
-											<i class="fas fa-times"></i>
-										</button>
-									}
+									<div class="flex items-center gap-1">
+										if node.Role == "worker" {
+											<button
+												hx-post={ fmt.Sprintf("/swarm/nodes/%s/update", node.ID) }
+												hx-vals='{"role":"manager"}'
+												hx-confirm={ fmt.Sprintf("Promote '%s' to manager?", node.Hostname) }
+												class="btn btn-sm btn-ghost text-purple-400 hover:text-purple-300"
+												title="Promote to Manager"
+											>
+												<i class="fas fa-arrow-up"></i>
+											</button>
+										}
+										if node.Role == "manager" && !node.IsLeader {
+											<button
+												hx-post={ fmt.Sprintf("/swarm/nodes/%s/update", node.ID) }
+												hx-vals='{"role":"worker"}'
+												hx-confirm={ fmt.Sprintf("Demote '%s' to worker?", node.Hostname) }
+												class="btn btn-sm btn-ghost text-yellow-400 hover:text-yellow-300"
+												title="Demote to Worker"
+											>
+												<i class="fas fa-arrow-down"></i>
+											</button>
+										}
+										if node.Availability == "active" {
+											<button
+												hx-post={ fmt.Sprintf("/swarm/nodes/%s/update", node.ID) }
+												hx-vals='{"availability":"drain"}'
+												hx-confirm={ fmt.Sprintf("Drain node '%s'? Tasks will be rescheduled to other nodes.", node.Hostname) }
+												class="btn btn-sm btn-ghost text-orange-400 hover:text-orange-300"
+												title="Drain Node"
+											>
+												<i class="fas fa-water"></i>
+											</button>
+										} else if node.Availability == "drain" || node.Availability == "pause" {
+											<button
+												hx-post={ fmt.Sprintf("/swarm/nodes/%s/update", node.ID) }
+												hx-vals='{"availability":"active"}'
+												class="btn btn-sm btn-ghost text-green-400 hover:text-green-300"
+												title="Set Active"
+											>
+												<i class="fas fa-play"></i>
+											</button>
+										}
+										if !node.IsLeader {
+											<button
+												hx-delete={ fmt.Sprintf("/swarm/nodes/%s", node.ID) }
+												hx-confirm={ fmt.Sprintf("Remove node '%s' from Swarm cluster?", node.Hostname) }
+												class="btn btn-sm btn-ghost text-red-400 hover:text-red-300"
+												title="Remove from Cluster"
+											>
+												<i class="fas fa-times"></i>
+											</button>
+										}
+									</div>
 								</td>
 							</tr>
 						}
@@ -279,15 +366,24 @@ templ clusterActive(data ClusterData) {
 										}
 									</td>
 									<td class="p-3 text-gray-400 text-sm font-mono">{ svc.Ports }</td>
-									<td class="p-3 flex gap-1">
+									<td class="p-3">
+									<div class="flex items-center gap-1">
+										<a href={ templ.SafeURL(fmt.Sprintf("/swarm/services/%s", svc.ID)) }
+											class="btn btn-sm btn-ghost text-blue-400 hover:text-blue-300"
+											title="View Details"
+										>
+											<i class="fas fa-eye"></i>
+										</a>
 										<button
 											hx-delete={ fmt.Sprintf("/swarm/services/%s", svc.ID) }
 											hx-confirm={ fmt.Sprintf("Remove service '%s'? This will stop all replicas.", svc.Name) }
 											class="btn btn-sm btn-ghost text-red-400 hover:text-red-300"
+											title="Remove Service"
 										>
 											<i class="fas fa-trash"></i>
 										</button>
-									</td>
+									</div>
+								</td>
 								</tr>
 							}
 						</tbody>

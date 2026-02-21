@@ -463,6 +463,27 @@ func RegisterFrontendRoutes(r chi.Router, h *Handler, m *Middleware) {
 				r.Post("/variables/{id}/delete", h.ConfigVarDelete)
 				r.Delete("/variables/{id}", h.ConfigVarDelete)
 			})
+
+			// Docker Daemon Configuration
+			r.Route("/docker", func(r chi.Router) {
+				r.Group(func(r chi.Router) {
+					r.Use(m.RequirePermission("config:view"))
+					r.Get("/", h.DockerConfigTempl)
+				})
+				r.Group(func(r chi.Router) {
+					r.Use(m.RequirePermission("config:update"))
+					r.Post("/network", h.DockerConfigUpdateNetwork)
+					r.Post("/logging", h.DockerConfigUpdateLogging)
+					r.Post("/registry", h.DockerConfigUpdateRegistry)
+					r.Post("/runtime", h.DockerConfigUpdateRuntime)
+					r.Post("/proxy", h.DockerConfigUpdateProxy)
+					r.Post("/security", h.DockerConfigUpdateSecurity)
+					r.Post("/general", h.DockerConfigUpdateGeneral)
+					r.Post("/reload", h.DockerConfigReload)
+					r.Post("/restart", h.DockerConfigRestart)
+					r.Post("/backup/restore/{name}", h.DockerConfigRestoreBackup)
+				})
+			})
 		})
 
 		// Terminal Hub (multi-tab terminal) - requires container:exec
@@ -533,22 +554,24 @@ func RegisterFrontendRoutes(r chi.Router, h *Handler, m *Middleware) {
 			r.Group(func(r chi.Router) {
 				r.Use(m.RequirePermission("host:view"))
 				r.Get("/", h.SwarmClusterTempl)
-				r.Get("/services/{serviceID}", func(w http.ResponseWriter, r *http.Request) {
-					serviceID := chi.URLParam(r, "serviceID")
-					http.Redirect(w, r, "/swarm?service="+serviceID, http.StatusSeeOther)
-				})
+				r.Get("/services/{serviceID}", h.SwarmServiceDetailTempl)
+				r.Get("/services/{serviceID}/logs", h.SwarmServiceLogsTempl)
 			})
 
 			// Create/manage - require host:create (Swarm operations are privileged)
 			r.Group(func(r chi.Router) {
 				r.Use(m.RequirePermission("host:create"))
 				r.Post("/init", h.SwarmInitTempl)
+				r.Post("/join", h.SwarmJoinTempl)
 				r.Post("/leave", h.SwarmLeaveTempl)
+				r.Post("/nodes/{nodeID}/update", h.SwarmNodeUpdateTempl)
 				r.Delete("/nodes/{nodeID}", h.SwarmNodeRemoveTempl)
 				r.Get("/services/new", h.SwarmServiceCreateFormTempl)
 				r.Post("/services/create", h.SwarmServiceCreateTempl)
-				r.Delete("/services/{serviceID}", h.SwarmServiceRemoveTempl)
+				r.Post("/services/{serviceID}/update", h.SwarmServiceUpdateTempl)
+				r.Post("/services/{serviceID}/rollback", h.SwarmServiceRollbackTempl)
 				r.Post("/services/{serviceID}/scale", h.SwarmServiceScaleTempl)
+				r.Delete("/services/{serviceID}", h.SwarmServiceRemoveTempl)
 				r.Post("/convert", h.SwarmConvertContainerTempl)
 			})
 		})
@@ -1207,7 +1230,35 @@ func RegisterFrontendRoutes(r chi.Router, h *Handler, m *Middleware) {
 		})
 
 		// Calendar
-		r.Get("/calendar", h.CalendarPage)
+		r.Route("/calendar", func(r chi.Router) {
+			r.Get("/", h.CalendarPage)
+
+			// AJAX JSON endpoints (session auth + CSRF via X-CSRF-Token header)
+			r.Route("/events", func(r chi.Router) {
+				r.Get("/", h.CalendarListEvents)
+				r.Post("/", h.CalendarCreateEvent)
+				r.Put("/{id}", h.CalendarUpdateEvent)
+				r.Delete("/{id}", h.CalendarDeleteEvent)
+			})
+			r.Route("/tasks", func(r chi.Router) {
+				r.Get("/", h.CalendarListTasks)
+				r.Post("/", h.CalendarCreateTask)
+				r.Patch("/{id}/toggle", h.CalendarToggleTask)
+				r.Delete("/{id}", h.CalendarDeleteTask)
+			})
+			r.Route("/notes", func(r chi.Router) {
+				r.Get("/", h.CalendarListNotes)
+				r.Post("/", h.CalendarCreateNote)
+				r.Put("/{id}", h.CalendarUpdateNote)
+				r.Delete("/{id}", h.CalendarDeleteNote)
+			})
+			r.Route("/checklists", func(r chi.Router) {
+				r.Get("/", h.CalendarListChecklists)
+				r.Post("/", h.CalendarCreateChecklist)
+				r.Put("/{id}", h.CalendarUpdateChecklist)
+				r.Delete("/{id}", h.CalendarDeleteChecklist)
+			})
+		})
 
 		// Topology (requires container:view — shows container relationships)
 		r.With(m.RequirePermission("container:view")).Get("/topology", h.TopologyTempl)
@@ -1359,6 +1410,7 @@ func RegisterFrontendRoutes(r chi.Router, h *Handler, m *Middleware) {
 			r.Get("/", h.DriftTempl)
 			r.Post("/{id}/accept", h.DriftAcceptAPI)
 			r.Post("/{id}/remediate", h.DriftRemediateAPI)
+			r.Post("/{id}/set-baseline", h.DriftSetBaselineAPI)
 		})
 
 		// Drift Detection API

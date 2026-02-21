@@ -5,8 +5,10 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -300,8 +302,6 @@ func buildVulnViewsFromIssues(issues []IssueView) ([]vulntmpl.VulnerabilityView,
 
 // VulnScan triggers a vulnerability scan using the existing security service.
 func (h *Handler) VulnScan(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
 	secSvc := h.services.Security()
 	if secSvc == nil {
 		h.setFlash(w, r, "error", "Security service unavailable")
@@ -309,17 +309,27 @@ func (h *Handler) VulnScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := secSvc.ScanAll(ctx); err != nil {
-		h.setFlash(w, r, "error", "Scan failed: "+err.Error())
-		http.Redirect(w, r, "/vulnerabilities", http.StatusSeeOther)
-		return
+	// Run scan in background — full vulnerability scans can take minutes.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
-	issues, err := secSvc.ListIssues(ctx)
-	if err == nil && h.trackedVulnRepo != nil {
+	go func() {
+		if err := secSvc.ScanAll(bgCtx); err != nil {
+			slog.Error("vulnerability scan failed", "error", err)
+			return
+		}
+
+		// Import results into tracked vulnerabilities
+		issues, err := secSvc.ListIssues(bgCtx)
+		if err != nil || h.trackedVulnRepo == nil {
+			return
+		}
+
 		containerImages := make(map[string]string)
 		if containerSvc := h.services.Containers(); containerSvc != nil {
-			if containers, _, cerr := containerSvc.List(ctx, nil); cerr == nil {
+			if containers, _, cerr := containerSvc.List(bgCtx, nil); cerr == nil {
 				for _, c := range containers {
 					containerImages[c.ID] = c.Image
 				}
@@ -348,8 +358,6 @@ func (h *Handler) VulnScan(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		imported := 0
-		updated := 0
 		for _, ci := range cveMap {
 			imageSet := make(map[string]struct{})
 			for cid := range ci.containerIDs {
@@ -387,25 +395,12 @@ func (h *Handler) VulnScan(w http.ResponseWriter, r *http.Request) {
 				DetectedAt:     time.Now(),
 			}
 
-			existed, _ := h.trackedVulnRepo.ExistsByCVE(ctx, ci.issue.CVEID)
-			if err := h.trackedVulnRepo.Upsert(ctx, v); err == nil {
-				if existed {
-					updated++
-				} else {
-					imported++
-				}
-			}
+			h.trackedVulnRepo.ExistsByCVE(bgCtx, ci.issue.CVEID)
+			h.trackedVulnRepo.Upsert(bgCtx, v)
 		}
+	}()
 
-		msg := fmt.Sprintf("Vulnerability scan complete: %d new CVEs imported", imported)
-		if updated > 0 {
-			msg += fmt.Sprintf(", %d updated", updated)
-		}
-		h.setFlash(w, r, "success", msg)
-	} else if err != nil {
-		h.setFlash(w, r, "warning", "Scan triggered but failed to import results: "+err.Error())
-	}
-
+	h.setFlash(w, r, "success", "Vulnerability scan started. Refresh for results.")
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/vulnerabilities")
 		w.WriteHeader(http.StatusOK)

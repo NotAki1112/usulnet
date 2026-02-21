@@ -57,6 +57,7 @@ templ ImagesList(data ImagesListData) {
 				<p class="text-gray-400 mt-1">Manage Docker images ({ data.TotalSize } total)</p>
 			</div>
 			<div class="flex items-center gap-3">
+				@components.RefreshButton()
 				<a href="/images/pull" class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-gray-300 rounded-lg transition-colors">
 					<i class="fas fa-download mr-2"></i>
 					Pull Image

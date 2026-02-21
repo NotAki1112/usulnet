@@ -65,6 +65,7 @@ templ ContainersList(data ContainersListData) {
 					<p class="text-gray-400 mt-1">Manage your Docker containers</p>
 				</div>
 				<div class="flex items-center gap-3">
+					@components.RefreshButton()
 					<a href="/containers/new" class="btn-primary">
 						<i class="fas fa-plus"></i>
 						New Container

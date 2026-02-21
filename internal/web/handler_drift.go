@@ -167,6 +167,44 @@ func (h *Handler) DriftRemediateAPI(w http.ResponseWriter, r *http.Request) {
 	h.redirect(w, r, "/drift")
 }
 
+// DriftSetBaselineAPI sets the current state as the new baseline (POST).
+func (h *Handler) DriftSetBaselineAPI(w http.ResponseWriter, r *http.Request) {
+	if h.driftSvc == nil {
+		h.jsonError(w, "drift detection not available", http.StatusServiceUnavailable)
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		h.jsonError(w, "invalid drift detection ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get the drift detection to find the current snapshot ID
+	detection, err := h.driftSvc.GetDriftByID(r.Context(), id)
+	if err != nil {
+		h.logger.Error("failed to get drift detection", "id", id, "error", err)
+		h.setFlash(w, r, "error", "Failed to find drift detection.")
+		h.redirect(w, r, "/drift")
+		return
+	}
+
+	if detection.CurrentSnapshotID == nil {
+		h.setFlash(w, r, "error", "No current snapshot available to set as baseline.")
+		h.redirect(w, r, "/drift")
+		return
+	}
+
+	if err := h.driftSvc.SetBaseline(r.Context(), *detection.CurrentSnapshotID); err != nil {
+		h.logger.Error("failed to set baseline", "id", id, "snapshot_id", detection.CurrentSnapshotID, "error", err)
+		h.setFlash(w, r, "error", "Failed to set baseline.")
+		h.redirect(w, r, "/drift")
+		return
+	}
+
+	h.setFlash(w, r, "success", "Current state set as new baseline.")
+	h.redirect(w, r, "/drift")
+}
+
 // DriftListAPI returns a paginated list of drift detections as JSON.
 func (h *Handler) DriftListAPI(w http.ResponseWriter, r *http.Request) {
 	if h.driftSvc == nil {

@@ -467,13 +467,10 @@ templ New(data StackNewData) {
 							return reader.read().then(({ done, value }) => {
 								if (done) return;
 								buf += decoder.decode(value, { stream: true });
-								const parts = buf.split('
-
-');
+								const parts = buf.split('\n\n');
 								buf = parts.pop();
 								parts.forEach(block => {
-									const lines = block.split('
-');
+									const lines = block.split('\n');
 									let evt = '', data = '';
 									lines.forEach(l => {
 										if (l.startsWith('event: ')) evt = l.slice(7);

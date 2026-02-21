@@ -491,10 +491,13 @@ templ LDAPBrowser(data LDAPBrowserData) {
 				toggleWriteMode() {
 					fetch(`/connections/ldap/${this.connID}/write-mode`, {
 						method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' },
+						headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' },
 						body: JSON.stringify({ enabled: this.writeEnabled })
-					}).then(() => {
-						location.reload();
+					}).then(resp => {
+						if (resp.ok) { location.reload(); }
+						else if (window.usulnet) { window.usulnet.toast('Failed to toggle write mode', 'error'); }
+					}).catch(() => {
+						if (window.usulnet) { window.usulnet.toast('Network error toggling write mode', 'error'); }
 					});
 				},
 

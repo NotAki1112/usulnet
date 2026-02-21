@@ -330,8 +330,21 @@ func (m *Middleware) FlashMiddleware(next http.Handler) http.Handler {
 		}
 
 		if session != nil {
-			// Check for flash message
-			if flash, ok := session.Values["flash"].(*FlashMessage); ok && flash != nil {
+			// Check for flash message.
+			// Note: session data is JSON-serialized via Redis, so *FlashMessage
+			// comes back as map[string]interface{} after deserialization.
+			var flash *FlashMessage
+			switch v := session.Values["flash"].(type) {
+			case *FlashMessage:
+				flash = v
+			case map[string]interface{}:
+				t, _ := v["type"].(string)
+				msg, _ := v["message"].(string)
+				if t != "" || msg != "" {
+					flash = &FlashMessage{Type: t, Message: msg}
+				}
+			}
+			if flash != nil {
 				ctx = context.WithValue(ctx, ContextKeyFlash, flash)
 				// Clear flash from session
 				delete(session.Values, "flash")

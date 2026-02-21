@@ -181,6 +181,7 @@ func (app *Application) initAPI(ctx context.Context, ic *initContext) error {
 	// Populate initContext
 	ic.registryRepo = registryRepo
 	ic.registryBrowseSvc = registryBrowseSvc
+	ic.calendarService = calendarSvc
 
 	return nil
 }

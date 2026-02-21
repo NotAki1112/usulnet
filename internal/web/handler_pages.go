@@ -238,7 +238,11 @@ func (h *Handler) StackCatalogDeploySubmit(w http.ResponseWriter, r *http.Reques
 	}
 	composeContent := app.RenderCompose(values)
 
-	ctx := r.Context()
+	// Use background context so deploys continue even if browser disconnects.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
+	}
 
 	// SSE streaming mode: browser sends X-Deploy-Stream: 1
 	if r.Header.Get("X-Deploy-Stream") == "1" {
@@ -260,19 +264,34 @@ func (h *Handler) StackCatalogDeploySubmit(w http.ResponseWriter, r *http.Reques
 		}
 		doneCh := make(chan doneResult, 1)
 		go func() {
-			sn, err := h.services.Stacks().DeployStream(ctx, stackName, composeContent, logCh)
+			sn, err := h.services.Stacks().DeployStream(bgCtx, stackName, composeContent, logCh)
 			doneCh <- doneResult{stackName: sn, err: err}
 		}()
 
-		writeSSE := func(event, data string) {
-			fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+		writeSSE := func(event, data string) bool {
+			_, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
+			if err != nil {
+				return false
+			}
 			flusher.Flush()
+			return true
 		}
+		clientConnected := true
 		for line := range logCh {
-			escaped := strings.ReplaceAll(line, "\n", " ")
-			writeSSE("log", escaped)
+			if clientConnected {
+				escaped := strings.ReplaceAll(line, "\n", " ")
+				if !writeSSE("log", escaped) {
+					clientConnected = false
+				}
+			}
 		}
 		res := <-doneCh
+		if !clientConnected {
+			if res.err != nil {
+				slog.Error("catalog deploy failed (client disconnected)", "app", slug, "name", stackName, "error", res.err)
+			}
+			return
+		}
 		if res.err != nil {
 			msg, _ := json.Marshal(res.err.Error())
 			writeSSE("done", fmt.Sprintf(`{"ok":false,"error":%s}`, msg))
@@ -282,13 +301,15 @@ func (h *Handler) StackCatalogDeploySubmit(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.services.Stacks().Deploy(ctx, stackName, composeContent); err != nil {
-		slog.Error("catalog deploy failed", "app", slug, "stack", stackName, "error", err)
-		h.renderCatalogDeployError(w, r, app, "Error al desplegar: "+err.Error(), nil, values)
-		return
-	}
+	// Non-streaming fallback: deploy in background.
+	go func() {
+		if err := h.services.Stacks().Deploy(bgCtx, stackName, composeContent); err != nil {
+			slog.Error("catalog deploy failed", "app", slug, "stack", stackName, "error", err)
+		}
+	}()
 
-	h.redirect(w, r, "/stacks/"+stackName)
+	h.setFlash(w, r, "success", "Stack '"+stackName+"' is being deployed. Refresh for status.")
+	h.redirect(w, r, "/stacks")
 }
 
 // renderCatalogDeployError re-renders the catalog deploy form preserving user values.
@@ -1722,23 +1743,29 @@ func (h *Handler) ImagePullSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve registry credentials for the image reference
+	// Resolve registry credentials before the request context dies on redirect.
 	auth := h.resolveRegistryAuth(r.Context(), reference)
 
-	if auth != nil {
-		if err := h.services.Images().PullWithAuth(r.Context(), reference, auth); err != nil {
-			h.setFlash(w, r, "error", "Failed to pull image: "+err.Error())
-		} else {
-			h.setFlash(w, r, "success", "Image "+reference+" pulled successfully")
-		}
-	} else {
-		if err := h.services.Images().Pull(r.Context(), reference); err != nil {
-			h.setFlash(w, r, "error", "Failed to pull image: "+err.Error())
-		} else {
-			h.setFlash(w, r, "success", "Image "+reference+" pulled successfully")
-		}
+	// Pull in background so the operation completes even if browser navigates away.
+	// Image pulls can take minutes for large images.
+	bgCtx := context.Background()
+	if activeHost := GetActiveHostIDFromContext(r.Context()); activeHost != "" {
+		bgCtx = context.WithValue(bgCtx, ContextKeyActiveHost, activeHost)
 	}
 
+	go func() {
+		var err error
+		if auth != nil {
+			err = h.services.Images().PullWithAuth(bgCtx, reference, auth)
+		} else {
+			err = h.services.Images().Pull(bgCtx, reference)
+		}
+		if err != nil {
+			slog.Error("image pull failed", "reference", reference, "error", err)
+		}
+	}()
+
+	h.setFlash(w, r, "success", "Pulling image "+reference+". Refresh the page for progress.")
 	http.Redirect(w, r, "/images", http.StatusSeeOther)
 }
 

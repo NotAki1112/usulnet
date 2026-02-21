@@ -652,6 +652,16 @@ func (app *Application) initWeb(ctx context.Context, ic *initContext) error {
 	hdlDeps.CostOptSvc = costOptSvc
 	app.Logger.Info("Cost/resource optimization enabled")
 
+	// Docker daemon configuration (local only)
+	if ic.dockerConfigService != nil {
+		hdlDeps.DockerConfigSvc = ic.dockerConfigService
+	}
+
+	// Calendar service (events, tasks, notes, checklists)
+	if ic.calendarService != nil {
+		hdlDeps.CalendarSvc = ic.calendarService
+	}
+
 	// H4: Docker client for events page
 	if ic.dockerClient != nil {
 		regDeps.DockerClient = ic.dockerClient

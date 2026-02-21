@@ -16,6 +16,7 @@ import (
 	backupsvc "github.com/fr4nsys/usulnet/internal/services/backup"
 	backupstorage "github.com/fr4nsys/usulnet/internal/services/backup/storage"
 	configsvc "github.com/fr4nsys/usulnet/internal/services/config"
+	dockerconfigsvc "github.com/fr4nsys/usulnet/internal/services/dockerconfig"
 	notificationsvc "github.com/fr4nsys/usulnet/internal/services/notification"
 	securitysvc "github.com/fr4nsys/usulnet/internal/services/security"
 	securityanalyzer "github.com/fr4nsys/usulnet/internal/services/security/analyzer"
@@ -338,6 +339,16 @@ func (app *Application) initServices(ctx context.Context, ic *initContext) error
 	ic.configSyncService = configSyncService
 	ic.updateService = updateService
 	ic.notificationService = notificationService
+
+	// Docker Daemon Config Service (local filesystem)
+	ic.dockerConfigService = dockerconfigsvc.NewService(
+		dockerconfigsvc.Config{
+			ConfigPath: "/etc/docker/daemon.json",
+			BackupDir:  "/etc/docker/backups",
+		},
+		app.Logger,
+	)
+	app.Logger.Info("Docker daemon config service initialized")
 
 	return nil
 }

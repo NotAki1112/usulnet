@@ -140,10 +140,11 @@ type BackupService interface {
 
 // BackupCreateOptions for creating backups
 type BackupCreateOptions struct {
-	HostID      uuid.UUID
-	ContainerID string
-	Trigger     string
-	CreatedBy   *uuid.UUID
+	HostID        uuid.UUID
+	ContainerID   string
+	ContainerName string
+	Trigger       string
+	CreatedBy     *uuid.UUID
 }
 
 // BackupResult from creating a backup
@@ -456,18 +457,19 @@ func (s *Service) executeUpdate(ctx context.Context, update *models.Update, cont
 		s.repo.UpdateStatus(ctx, update.ID, update.Status, nil)
 
 		backupResult, err := s.backupService.Create(ctx, BackupCreateOptions{
-			HostID:      update.HostID,
-			ContainerID: update.TargetID,
-			Trigger:     "pre_update",
-			CreatedBy:   opts.CreatedBy,
+			HostID:        update.HostID,
+			ContainerID:   update.TargetID,
+			ContainerName: update.TargetName,
+			Trigger:       "pre_update",
+			CreatedBy:     opts.CreatedBy,
 		})
 		if err != nil {
-			log.Error("Backup failed", "error", err)
-			return s.failUpdate(ctx, update, result, "backup failed: "+err.Error())
+			log.Warn("Pre-update backup failed, continuing update", "error", err)
+		} else {
+			update.BackupID = &backupResult.BackupID
+			result.BackupID = &backupResult.BackupID
+			log.Info("Backup created", "backup_id", backupResult.BackupID)
 		}
-		update.BackupID = &backupResult.BackupID
-		result.BackupID = &backupResult.BackupID
-		log.Info("Backup created", "backup_id", backupResult.BackupID)
 	}
 
 	// 3. Pull new image

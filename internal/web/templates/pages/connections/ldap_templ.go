@@ -699,7 +699,7 @@ func LDAPBrowser(data LDAPBrowserData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</div><!-- Settings Modal (Danger Zone) --><div x-show=\"showSettingsModal\" x-cloak class=\"fixed inset-0 z-50 overflow-y-auto\"><div class=\"flex min-h-screen items-center justify-center p-4\"><div class=\"fixed inset-0 bg-black/60\" @click=\"showSettingsModal = false\"></div><div class=\"relative card w-full max-w-md p-6\"><h3 class=\"text-lg font-semibold text-white mb-4\"><i class=\"fas fa-cog text-gray-400 mr-2\"></i>Browser Settings</h3><!-- Danger Zone --><div class=\"border border-red-500/30 rounded-lg p-4 bg-red-500/5 mb-4\"><h4 class=\"text-red-400 font-medium flex items-center gap-2 mb-2\"><i class=\"fas fa-exclamation-triangle\"></i> Danger Zone</h4><p class=\"text-gray-400 text-sm mb-3\">Enabling write mode allows you to modify LDAP entries and attributes. Incorrect changes can cause <strong class=\"text-red-400\">authentication failures</strong>, <strong class=\"text-red-400\">access control issues</strong>, or <strong class=\"text-red-400\">directory corruption</strong>.</p><div class=\"flex items-center justify-between p-3 bg-dark-800 rounded-lg\"><div><p class=\"text-white text-sm font-medium\">Enable Write Mode</p><p class=\"text-gray-500 text-xs\">Allow ADD, MODIFY, DELETE operations</p></div><label class=\"relative inline-flex items-center cursor-pointer\"><input type=\"checkbox\" x-model=\"writeEnabled\" class=\"sr-only peer\" @change=\"toggleWriteMode()\"><div class=\"w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500\"></div></label></div><div x-show=\"writeEnabled\" class=\"mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg\"><p class=\"text-red-400 text-xs flex items-center gap-2\"><i class=\"fas fa-shield-alt\"></i> Write mode is now enabled. Changes affect production directory!</p></div></div><!-- Other settings --><div class=\"space-y-3\"><div class=\"flex items-center justify-between\"><span class=\"text-gray-300 text-sm\">Page size (entries)</span> <select x-model=\"pageSize\" class=\"input text-sm w-24\"><option value=\"50\">50</option> <option value=\"100\">100</option> <option value=\"250\">250</option> <option value=\"500\">500</option></select></div><div class=\"flex items-center justify-between\"><span class=\"text-gray-300 text-sm\">Show operational attributes</span> <label class=\"relative inline-flex items-center cursor-pointer\"><input type=\"checkbox\" x-model=\"showOperational\" class=\"sr-only peer\"><div class=\"w-9 h-5 bg-dark-600 rounded-full peer peer-checked:bg-primary-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all\"></div></label></div></div><div class=\"flex justify-end mt-6\"><button @click=\"showSettingsModal = false\" class=\"btn-primary\">Done</button></div></div></div></div></div><script>\n\t\tfunction ldapBrowser() {\n\t\t\treturn {\n\t\t\t\tshowSettingsModal: false,\n\t\t\t\tshowAddAttributeModal: false,\n\t\t\t\twriteEnabled: false,\n\t\t\t\tpageSize: 100,\n\t\t\t\tshowOperational: false,\n\t\t\t\tsearchQuery: '',\n\t\t\t\tconnID: '',\n\n\t\t\t\tinit() {\n\t\t\t\t\tthis.writeEnabled = this.$el.dataset.writeEnabled === 'true';\n\t\t\t\t\tthis.connID = this.$el.dataset.connId || '';\n\t\t\t\t},\n\n\t\t\t\ttoggleWriteMode() {\n\t\t\t\t\tfetch(`/connections/ldap/${this.connID}/write-mode`, {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\theaders: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' },\n\t\t\t\t\t\tbody: JSON.stringify({ enabled: this.writeEnabled })\n\t\t\t\t\t}).then(() => {\n\t\t\t\t\t\tlocation.reload();\n\t\t\t\t\t});\n\t\t\t\t},\n\n\t\t\t\tloadEntries(dn) {\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}?dn=${encodeURIComponent(dn)}`;\n\t\t\t\t},\n\n\t\t\t\tselectEntry(dn) {\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}?entry=${encodeURIComponent(dn)}`;\n\t\t\t\t},\n\n\t\t\t\tdoSearch() {\n\t\t\t\t\tif (!this.searchQuery.trim()) return;\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}/search?q=${encodeURIComponent(this.searchQuery)}`;\n\t\t\t\t},\n\n\t\t\t\tconfirmDelete() {\n\t\t\t\t\tif (confirm('Delete this entry? This action cannot be undone and may affect authentication and access control.')) {\n\t\t\t\t\t\t// Delete logic\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t};\n\t\t}\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</div><!-- Settings Modal (Danger Zone) --><div x-show=\"showSettingsModal\" x-cloak class=\"fixed inset-0 z-50 overflow-y-auto\"><div class=\"flex min-h-screen items-center justify-center p-4\"><div class=\"fixed inset-0 bg-black/60\" @click=\"showSettingsModal = false\"></div><div class=\"relative card w-full max-w-md p-6\"><h3 class=\"text-lg font-semibold text-white mb-4\"><i class=\"fas fa-cog text-gray-400 mr-2\"></i>Browser Settings</h3><!-- Danger Zone --><div class=\"border border-red-500/30 rounded-lg p-4 bg-red-500/5 mb-4\"><h4 class=\"text-red-400 font-medium flex items-center gap-2 mb-2\"><i class=\"fas fa-exclamation-triangle\"></i> Danger Zone</h4><p class=\"text-gray-400 text-sm mb-3\">Enabling write mode allows you to modify LDAP entries and attributes. Incorrect changes can cause <strong class=\"text-red-400\">authentication failures</strong>, <strong class=\"text-red-400\">access control issues</strong>, or <strong class=\"text-red-400\">directory corruption</strong>.</p><div class=\"flex items-center justify-between p-3 bg-dark-800 rounded-lg\"><div><p class=\"text-white text-sm font-medium\">Enable Write Mode</p><p class=\"text-gray-500 text-xs\">Allow ADD, MODIFY, DELETE operations</p></div><label class=\"relative inline-flex items-center cursor-pointer\"><input type=\"checkbox\" x-model=\"writeEnabled\" class=\"sr-only peer\" @change=\"toggleWriteMode()\"><div class=\"w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500\"></div></label></div><div x-show=\"writeEnabled\" class=\"mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg\"><p class=\"text-red-400 text-xs flex items-center gap-2\"><i class=\"fas fa-shield-alt\"></i> Write mode is now enabled. Changes affect production directory!</p></div></div><!-- Other settings --><div class=\"space-y-3\"><div class=\"flex items-center justify-between\"><span class=\"text-gray-300 text-sm\">Page size (entries)</span> <select x-model=\"pageSize\" class=\"input text-sm w-24\"><option value=\"50\">50</option> <option value=\"100\">100</option> <option value=\"250\">250</option> <option value=\"500\">500</option></select></div><div class=\"flex items-center justify-between\"><span class=\"text-gray-300 text-sm\">Show operational attributes</span> <label class=\"relative inline-flex items-center cursor-pointer\"><input type=\"checkbox\" x-model=\"showOperational\" class=\"sr-only peer\"><div class=\"w-9 h-5 bg-dark-600 rounded-full peer peer-checked:bg-primary-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all\"></div></label></div></div><div class=\"flex justify-end mt-6\"><button @click=\"showSettingsModal = false\" class=\"btn-primary\">Done</button></div></div></div></div></div><script>\n\t\tfunction ldapBrowser() {\n\t\t\treturn {\n\t\t\t\tshowSettingsModal: false,\n\t\t\t\tshowAddAttributeModal: false,\n\t\t\t\twriteEnabled: false,\n\t\t\t\tpageSize: 100,\n\t\t\t\tshowOperational: false,\n\t\t\t\tsearchQuery: '',\n\t\t\t\tconnID: '',\n\n\t\t\t\tinit() {\n\t\t\t\t\tthis.writeEnabled = this.$el.dataset.writeEnabled === 'true';\n\t\t\t\t\tthis.connID = this.$el.dataset.connId || '';\n\t\t\t\t},\n\n\t\t\t\ttoggleWriteMode() {\n\t\t\t\t\tfetch(`/connections/ldap/${this.connID}/write-mode`, {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' },\n\t\t\t\t\t\tbody: JSON.stringify({ enabled: this.writeEnabled })\n\t\t\t\t\t}).then(resp => {\n\t\t\t\t\t\tif (resp.ok) { location.reload(); }\n\t\t\t\t\t\telse if (window.usulnet) { window.usulnet.toast('Failed to toggle write mode', 'error'); }\n\t\t\t\t\t}).catch(() => {\n\t\t\t\t\t\tif (window.usulnet) { window.usulnet.toast('Network error toggling write mode', 'error'); }\n\t\t\t\t\t});\n\t\t\t\t},\n\n\t\t\t\tloadEntries(dn) {\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}?dn=${encodeURIComponent(dn)}`;\n\t\t\t\t},\n\n\t\t\t\tselectEntry(dn) {\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}?entry=${encodeURIComponent(dn)}`;\n\t\t\t\t},\n\n\t\t\t\tdoSearch() {\n\t\t\t\t\tif (!this.searchQuery.trim()) return;\n\t\t\t\t\twindow.location.href = `/connections/ldap/${this.connID}/search?q=${encodeURIComponent(this.searchQuery)}`;\n\t\t\t\t},\n\n\t\t\t\tconfirmDelete() {\n\t\t\t\t\tif (confirm('Delete this entry? This action cannot be undone and may affect authentication and access control.')) {\n\t\t\t\t\t\t// Delete logic\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t};\n\t\t}\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -850,7 +850,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 620, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 623, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -878,7 +878,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.Host)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 631, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 634, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -891,7 +891,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", data.Connection.Port))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 631, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 634, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -904,7 +904,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var38 templ.SafeURL
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/connections/ldap/%s", data.Connection.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 637, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 640, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -917,7 +917,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var39 templ.SafeURL
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/connections/ldap/%s/search", data.Connection.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 647, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 650, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
@@ -947,7 +947,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var41 templ.SafeURL
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/connections/ldap/%s/settings", data.Connection.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 672, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 675, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 			if templ_7745c5c3_Err != nil {
@@ -960,7 +960,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(data.PageData.CSRFToken)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 673, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 676, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
@@ -973,7 +973,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 680, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 683, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 			if templ_7745c5c3_Err != nil {
@@ -986,7 +986,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.Host)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 686, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 689, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -999,7 +999,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", data.Connection.Port))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 690, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 693, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 			if templ_7745c5c3_Err != nil {
@@ -1012,7 +1012,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.BaseDN)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 696, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 699, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 			if templ_7745c5c3_Err != nil {
@@ -1025,7 +1025,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.BindDN)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 701, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 704, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 			if templ_7745c5c3_Err != nil {
@@ -1073,7 +1073,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 				var templ_7745c5c3_Var48 string
 				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.LastChecked)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 749, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 752, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 				if templ_7745c5c3_Err != nil {
@@ -1091,7 +1091,7 @@ func LDAPConnectionSettings(data LDAPConnectionSettingsData) templ.Component {
 			var templ_7745c5c3_Var49 string
 			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(data.Connection.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 754, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/templates/pages/connections/ldap.templ`, Line: 757, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 			if templ_7745c5c3_Err != nil {

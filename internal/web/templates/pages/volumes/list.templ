@@ -54,6 +54,7 @@ templ VolumesList(data VolumesListData) {
 				<p class="text-gray-400 mt-1">Manage Docker volumes ({ data.TotalSize } total)</p>
 			</div>
 			<div class="flex items-center gap-3">
+				@components.RefreshButton()
 				<a href="/volumes/new" class="btn-primary">
 					<i class="fas fa-plus mr-2"></i>
 					New Volume

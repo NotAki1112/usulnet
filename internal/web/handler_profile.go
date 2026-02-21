@@ -59,7 +59,7 @@ type SessionRepository interface {
 // ProfilePage renders the user profile page.
 func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	user := GetUserInfo(ctx)
+	user := GetUserFromContext(ctx)
 	if user == nil {
 		http.Redirect(w, r, "/login", http.StatusFound)
 		return
@@ -91,16 +91,20 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Get sessions if on security tab
+	// Get sessions and TOTP status if on security tab
 	var sessions []profile.SessionInfo
-	if activeTab == "security" && h.sessionRepo != nil {
-		sessions, _ = h.sessionRepo.GetUserSessions(user.ID)
-		currentSID := h.sessionRepo.GetCurrentSessionID(r)
-		for i := range sessions {
-			if sessions[i].ID == currentSID {
-				sessions[i].IsCurrent = true
+	var totpEnabled bool
+	if activeTab == "security" {
+		if h.sessionRepo != nil {
+			sessions, _ = h.sessionRepo.GetUserSessions(user.ID)
+			currentSID := h.sessionRepo.GetCurrentSessionID(r)
+			for i := range sessions {
+				if sessions[i].ID == currentSID {
+					sessions[i].IsCurrent = true
+				}
 			}
 		}
+		totpEnabled, _ = h.services.Users().HasTOTP(ctx, user.ID)
 	}
 
 	// Flash messages from session
@@ -117,7 +121,7 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 			Username:  user.Username,
 			Email:     user.Email,
 			Role:      user.Role,
-			IsActive:  user.IsActive,
+			IsActive:  true, // authenticated user is always active
 			Created:   prefs.FormatDate(h.getUserCreated(user.ID)),
 			LastLogin: h.getUserLastLogin(user.ID, prefs),
 		},
@@ -143,9 +147,10 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 		Languages: languages,
 		Sessions:  sessions,
 		ActiveTab: activeTab,
-		FlashMsg:  flashMsg,
-		FlashType: flashType,
-		CSRFToken: h.getCSRFToken(r),
+		FlashMsg:    flashMsg,
+		FlashType:   flashType,
+		CSRFToken:   h.getCSRFToken(r),
+		TotpEnabled: totpEnabled,
 	}
 
 	profile.Profile(data).Render(ctx, w)
@@ -156,7 +161,7 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -194,7 +199,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -268,7 +273,7 @@ func (h *Handler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -339,7 +344,7 @@ func (h *Handler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) ResetPreferences(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -363,7 +368,7 @@ func (h *Handler) ResetPreferences(w http.ResponseWriter, r *http.Request) {
 
 // DeleteSession revokes a single session (DELETE /profile/sessions/{id}).
 func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -381,7 +386,7 @@ func (h *Handler) DeleteSession(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAllSessions revokes all sessions except current (DELETE /profile/sessions).
 func (h *Handler) DeleteAllSessions(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -398,7 +403,7 @@ func (h *Handler) DeleteAllSessions(w http.ResponseWriter, r *http.Request) {
 
 // ExportUserData exports user data as JSON (POST /profile/export).
 func (h *Handler) ExportUserData(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -428,7 +433,7 @@ func (h *Handler) ExportUserData(w http.ResponseWriter, r *http.Request) {
 
 // DeleteAccount handles account self-deletion.
 func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -463,7 +468,7 @@ func (h *Handler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 func (h *Handler) ToggleTheme(w http.ResponseWriter, r *http.Request) {
-	user := GetUserInfo(r.Context())
+	user := GetUserFromContext(r.Context())
 	if user == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -570,17 +575,8 @@ func (h *Handler) UpdateSidebarPrefs(w http.ResponseWriter, r *http.Request) {
 }
 
 // ============================================================================
-// Helper Methods (stubs — implement with your Handler struct fields)
+// Helper Methods
 // ============================================================================
-
-// These reference fields that should exist on the Handler struct:
-//
-//   type Handler struct {
-//       // ... existing fields ...
-//       userRepo    UserRepository
-//       prefsRepo   PreferencesRepository
-//       sessionRepo SessionRepository
-//   }
 
 // getUserCreated returns the creation date of a user.
 // Falls back to querying sessions if the user repository doesn't provide CreatedAt.

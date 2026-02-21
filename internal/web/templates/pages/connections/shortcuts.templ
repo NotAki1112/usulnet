@@ -139,14 +139,18 @@ templ ShortcutsList(data ShortcutsListData) {
 		<script>
 			function deleteShortcut(id) {
 			fetch('/connections/shortcuts/' + id, {
-					method: 'DELETE',
+				method: 'DELETE',
 				headers: { 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content || '' },
-				}).then(response => {
-					if (response.ok) {
-						window.location.reload();
-					}
-				});
-			}
+			}).then(response => {
+				if (response.ok) {
+					window.location.reload();
+				} else {
+					if (window.usulnet) { window.usulnet.toast('Failed to delete shortcut', 'error'); }
+				}
+			}).catch(() => {
+				if (window.usulnet) { window.usulnet.toast('Network error deleting shortcut', 'error'); }
+			});
+		}
 		</script>
 		<style>
 			.shortcut-icon-url.fallback-icon img { display: none; }
