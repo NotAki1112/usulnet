@@ -45,7 +45,7 @@ services:
       - SYS_ADMIN
     environment:
       - HOST_TERMINAL_ENABLED=${HOST_TERMINAL_ENABLED:-true}
-      - HOST_TERMINAL_USER=${HOST_TERMINAL_USER:-nobody}
+      - HOST_TERMINAL_USER=${HOST_TERMINAL_USER:-nobody_usulnet}
       - HOST_TERMINAL_SHELL=/bin/bash
       - GUACD_ENABLED=${GUACD_ENABLED:-true}
       - GUACD_HOST=${GUACD_HOST:-guacd}

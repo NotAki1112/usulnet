@@ -81,7 +81,7 @@ services:
 
       # --- Host terminal (web terminal into the Docker host) ---
       - HOST_TERMINAL_ENABLED=${HOST_TERMINAL_ENABLED:-true}
-      - HOST_TERMINAL_USER=${HOST_TERMINAL_USER:-nobody}
+      - HOST_TERMINAL_USER=${HOST_TERMINAL_USER:-nobody_usulnet}
       - HOST_TERMINAL_SHELL=/bin/bash
 
       # --- RDP Web Access (Apache Guacamole) ---
