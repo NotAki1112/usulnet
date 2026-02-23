@@ -1352,7 +1352,7 @@ usulnet is built on the shoulders of exceptional open-source projects:
 
 <p align="center">
   <sub>Built with care for the infrastructure community.</sub><br/>
-  <sub><strong>v26.2.0 Beta</strong> &mdash; Found a bug? <a href="https://github.com/fr4nsys/usulnet/issues/new">Report it here</a>. Your feedback makes usulnet better.</sub><br/><br/>
+  <sub><strong>v26.2.7</strong> &mdash; Found a bug? <a href="https://github.com/fr4nsys/usulnet/issues/new">Report it here</a>. Your feedback makes usulnet better.</sub><br/><br/>
   <a href="https://github.com/fr4nsys/usulnet">GitHub</a>&nbsp;&bull;
   <a href="https://github.com/fr4nsys/usulnet/issues">Issues</a>&nbsp;&bull;
   <a href="https://github.com/fr4nsys/usulnet/discussions">Discussions</a>
